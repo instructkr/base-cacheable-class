@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "redis>=6.2.0",
+    "valkey-glide>=2.0.1",
 ]
 
 [project.optional-dependencies]

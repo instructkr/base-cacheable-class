@@ -20,3 +20,11 @@ try:
 except ImportError:
     # Redis is optional
     pass
+
+try:
+    from .cache.valkey import ValkeyCache, ValkeyCacheDecorator, ValkeyClientConfig
+
+    __all__.extend(["ValkeyCache", "ValkeyCacheDecorator", "ValkeyClientConfig"])
+except ImportError:
+    # Valkey is optional
+    pass

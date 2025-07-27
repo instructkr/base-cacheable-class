@@ -4,7 +4,7 @@ from typing import Any
 
 from redis.asyncio import Redis
 
-from base_cacheable_class import CacheInterface
+from ...interfaces import CacheInterface
 
 
 class RedisCache(CacheInterface):

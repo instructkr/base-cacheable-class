@@ -1,8 +1,12 @@
 from abc import ABC
+import asyncio
 
 import pytest
+from unittest.mock import patch
 
 from base_cacheable_class import CacheDecoratorInterface, CacheInterface, CacheItem
+from base_cacheable_class.cache.in_memory.cache import InMemoryCache
+from base_cacheable_class.cache.in_memory.decorator import InMemoryCacheDecorator
 
 
 class TestCacheItem:
