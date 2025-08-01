@@ -1,16 +1,17 @@
 import asyncio
 import os
 
-from base_cacheable_class import BaseCacheableClass, RedisCache, RedisCacheDecorator
+from base_cacheable_class import BaseCacheableClass, AsyncCacheDecoratorFactory
 
 
 class ProductService(BaseCacheableClass):
     def __init__(self, redis_host="localhost", redis_port=6379, redis_password=None):
         # Initialize Redis cache
-        cache = RedisCache(host=redis_host, port=redis_port, password=redis_password or "", username="test", db=0)
-        cache_decorator = RedisCacheDecorator(cache, default_ttl=3600)  # 1 hour default
+        cache_decorator = AsyncCacheDecoratorFactory.redis(
+            host=redis_host, port=redis_port, password=redis_password or "", username="default", db=0, default_ttl=3600
+        )
         super().__init__(cache_decorator)
-        self._redis_cache = cache  # Keep reference for cleanup
+        self._redis_cache = self.get_cache_client()  # Keep reference for cleanup
 
         # Simulate product database
         self.products = {

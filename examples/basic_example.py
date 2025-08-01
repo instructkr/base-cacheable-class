@@ -1,12 +1,11 @@
 import asyncio
 
-from base_cacheable_class import BaseCacheableClass, InMemoryCache, InMemoryCacheDecorator
+from base_cacheable_class import BaseCacheableClass, AsyncCacheDecoratorFactory
 
 
 class WeatherService(BaseCacheableClass):
     def __init__(self):
-        cache = InMemoryCache()
-        cache_decorator = InMemoryCacheDecorator(cache, default_ttl=300)  # 5 minutes default
+        cache_decorator = AsyncCacheDecoratorFactory.in_memory(default_ttl=300)
         super().__init__(cache_decorator)
 
     @BaseCacheableClass.cache(ttl=60)  # Cache for 1 minute

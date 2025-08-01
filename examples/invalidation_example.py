@@ -1,12 +1,11 @@
 import asyncio
 
-from base_cacheable_class import BaseCacheableClass, InMemoryCache, InMemoryCacheDecorator
+from base_cacheable_class import BaseCacheableClass, AsyncCacheDecoratorFactory
 
 
 class UserRepository(BaseCacheableClass):
     def __init__(self):
-        cache = InMemoryCache()
-        cache_decorator = InMemoryCacheDecorator(cache, default_ttl=600)  # 10 minutes default
+        cache_decorator = AsyncCacheDecoratorFactory.in_memory(default_ttl=600)  # 10 minutes default
         super().__init__(cache_decorator)
         # Simulate database
         self.db = {
