@@ -2,8 +2,8 @@ import re
 import time
 from typing import Any, cast
 
-from ...interfaces import CacheInterface
-from ...models import CacheItem
+from ....models import CacheItem
+from ..interface import CacheInterface
 
 
 class InMemoryCache(CacheInterface):
