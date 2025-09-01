@@ -14,14 +14,14 @@ except ImportError:
     pass
 
 
-from ..utils.key_builders import key_builder, pattern_builder
+from ..utils.key_builders import default_key, default_pattern
 
 
 class AsyncCacheDecoratorFactory:
     @classmethod
     def in_memory(cls, default_ttl: int = 60) -> CacheDecorator:
         cache = InMemoryCache()
-        return CacheDecorator(cache, key_builder=key_builder, pattern_builder=pattern_builder, default_ttl=default_ttl)
+        return CacheDecorator(cache, key_builder=default_key, pattern_builder=default_pattern, default_ttl=default_ttl)
 
     @classmethod
     def redis(
@@ -44,4 +44,4 @@ class AsyncCacheDecoratorFactory:
             socket_timeout=socket_timeout,
             socket_connect_timeout=socket_connect_timeout,
         )
-        return CacheDecorator(cache, key_builder=key_builder, pattern_builder=pattern_builder, default_ttl=default_ttl)
+        return CacheDecorator(cache, key_builder=default_key, pattern_builder=default_pattern, default_ttl=default_ttl)

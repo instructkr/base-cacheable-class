@@ -3,6 +3,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
+from ..utils import default_key, default_pattern
 from ...interfaces import CacheDecoratorInterface
 from .interface import CacheInterface
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class CacheDecorator(CacheDecoratorInterface):
-    def __init__(self, cache: CacheInterface, key_builder, pattern_builder, default_ttl: int = 60):
+    def __init__(self, cache: CacheInterface, key_builder=default_key, pattern_builder=default_pattern, default_ttl: int = 60):
         self.cache = cache
         self.default_ttl = default_ttl
         self._key_builder = key_builder

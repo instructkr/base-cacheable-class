@@ -2,14 +2,14 @@ from collections.abc import Callable
 from typing import Any
 
 
-def key_builder(f: Callable[..., Any], *args: Any, **kwargs: Any) -> str:
+def default_key(f: Callable[..., Any], *args: Any, **kwargs: Any) -> str:
     arg_str = str(args)
     kwarg_str = str(kwargs) if kwargs else "{}"
     func_name = getattr(f, "__name__", "unknown")
     return f"{func_name}:{arg_str}:{kwarg_str}"
 
 
-def pattern_builder(target_func_name: str, param_mapping: dict[str, str] | None, **kwargs: Any) -> str:
+def default_pattern(target_func_name: str, param_mapping: dict[str, str] | None, **kwargs: Any) -> str:
     pattern = rf"{target_func_name}:\(.*\):{{.*}}"
     if param_mapping:
         # 매핑된 파라미터 값 추출
