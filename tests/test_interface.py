@@ -1,8 +1,15 @@
+import asyncio
 from abc import ABC
+from unittest.mock import patch
 
 import pytest
 
-from base_cacheable_class import CacheDecoratorInterface, CacheInterface, CacheItem
+from base_cacheable_class import (
+    CacheDecoratorInterface,
+    CacheItem,
+)
+from base_cacheable_class.cache.async_ import CacheInterface, InMemoryCache, CacheDecorator
+from base_cacheable_class.cache.utils import default_key, default_pattern
 
 
 class TestCacheItem:
@@ -177,7 +184,7 @@ class TestInMemoryCacheDecorator:
         """Test basic caching functionality"""
         cache = InMemoryCache()
         await cache.clear()
-        decorator = InMemoryCacheDecorator(cache, default_ttl=60)
+        decorator = CacheDecorator(cache, default_key, default_pattern, default_ttl=60)
 
         call_count = 0
 
@@ -205,29 +212,43 @@ class TestInMemoryCacheDecorator:
     @pytest.mark.asyncio
     async def test_key_builder(self):
         """Test key builder creates correct keys"""
-        cache = InMemoryCache()
-        decorator = InMemoryCacheDecorator(cache)
 
         def test_func():
             pass
 
         # Test with different arguments
-        key1 = decorator.key_builder(test_func, "self", "arg1", "arg2")
+        key1 = default_key(test_func, "self", "arg1", "arg2")
         assert key1 == "test_func:('self', 'arg1', 'arg2'):{}"
 
-        key2 = decorator.key_builder(test_func, "self", kwarg1="value1")
+        key2 = default_key(test_func, "self", kwarg1="value1")
         assert key2 == "test_func:('self',):{'kwarg1': 'value1'}"
 
         # Test without self (function call)
-        key3 = decorator.key_builder(test_func, "arg1", "arg2")
+        key3 = default_key(test_func, "arg1", "arg2")
         assert key3 == "test_func:('arg1', 'arg2'):{}"
+
+    @pytest.mark.asyncio
+    async def test_pattern_builder(self):
+        """Test pattern builder creates correct patterns"""
+
+        # Test when param_mapping in kwargs
+        param_mapping1 = {"arg1": "arg1"}
+        kwargs1 = {"arg1": "arg1", "arg2": "arg2"}
+        pattern1 = default_pattern("test_func", param_mapping1, **kwargs1)
+        assert pattern1 == "test_func:\\(.*\\):{.*'arg1':\\s*'arg1'.*}"
+
+        # Test when param_mapping not in kwargs
+        param_mapping2 = {"arg2": "arg2"}
+        kwargs2 = {"arg22": "arg22"}
+        pattern2 = default_pattern("test_func", param_mapping2, **kwargs2)
+        assert pattern2 == "test_func:\\(.*\\):{.*}"
 
     @pytest.mark.asyncio
     async def test_invalidate(self):
         """Test cache invalidation"""
         cache = InMemoryCache()
         await cache.clear()
-        decorator = InMemoryCacheDecorator(cache)
+        decorator = CacheDecorator(cache, default_key, default_pattern)
 
         call_count = 0
 
@@ -264,7 +285,7 @@ class TestInMemoryCacheDecorator:
         """Test invalidate all functionality"""
         cache = InMemoryCache()
         await cache.clear()
-        decorator = InMemoryCacheDecorator(cache)
+        decorator = CacheDecorator(cache, default_key, default_pattern)
 
         call_count = 0
 
@@ -300,7 +321,7 @@ class TestInMemoryCacheDecorator:
     async def test_error_handling(self):
         """Test error handling in decorator"""
         cache = InMemoryCache()
-        decorator = InMemoryCacheDecorator(cache)
+        decorator = CacheDecorator(cache, default_key, default_pattern)
 
         # Mock cache.get to raise an exception
         with patch.object(cache, "get", side_effect=Exception("Cache error")):
@@ -318,7 +339,7 @@ class TestInMemoryCacheDecorator:
         """Test that None results are not cached"""
         cache = InMemoryCache()
         await cache.clear()
-        decorator = InMemoryCacheDecorator(cache)
+        decorator = CacheDecorator(cache, default_key, default_pattern)
 
         call_count = 0
 

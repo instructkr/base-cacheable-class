@@ -3,28 +3,28 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
-from ...interfaces import CacheDecoratorInterface, CacheInterface
+from ...interfaces import CacheDecoratorInterface
+from ..utils.key_builders import default_key, default_pattern
+from .interface import CacheInterface
 
 logger = logging.getLogger(__name__)
 
 
-class RedisCacheDecorator(CacheDecoratorInterface):
-    def __init__(self, cache: CacheInterface, default_ttl: int = 60):
+class CacheDecorator(CacheDecoratorInterface):
+    def __init__(
+        self, cache: CacheInterface, key_builder=default_key, pattern_builder=default_pattern, default_ttl: int = 60
+    ):
         self.cache = cache
         self.default_ttl = default_ttl
+        self._key_builder = key_builder
+        self._pattern_builder = pattern_builder
 
-    def key_builder(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> str:
-        arg_str = str(args)
-        kwarg_str = str(kwargs) if kwargs else "{}"
-        func_name = getattr(func, "__name__", "unknown")
-        return f"{func_name}:{arg_str}:{kwarg_str}"
-
-    def __call__(self, ttl: int | None = None) -> Callable[..., Callable[..., Any]]:
+    def __call__(self, ttl: int | None = None) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
-                _key: str = self.key_builder(func, *args, **kwargs)
-                current_ttl: int = ttl if ttl is not None else self.default_ttl
+                _key = self._key_builder(func, *args, **kwargs)
+                current_ttl = ttl if ttl is not None else self.default_ttl
 
                 try:
                     cached_value = await self.cache.get(_key)
@@ -32,14 +32,11 @@ class RedisCacheDecorator(CacheDecoratorInterface):
                         return cached_value
 
                     result = await func(*args, **kwargs)
+
                     if result is not None:
                         await self.cache.set(_key, result, ttl=current_ttl)
+
                     return result
-
-                except (ConnectionError, TimeoutError) as e:
-                    logger.warning(f"Redis connection or timeout issue: {e}, falling back.")
-                    return await func(*args, **kwargs)
-
                 except Exception as e:
                     logger.error(f"Error in cache decorator: {e}")
                     return await func(*args, **kwargs)
@@ -50,27 +47,14 @@ class RedisCacheDecorator(CacheDecoratorInterface):
 
     def invalidate(
         self, target_func_name: str, param_mapping: dict[str, str] | None = None
-    ) -> Callable[..., Callable[..., Any]]:
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
                 try:
-                    pattern = rf"{target_func_name}:\(.*\):{{.*}}"
+                    pattern = self._pattern_builder(target_func_name, param_mapping, **kwargs)
+                    cached_keys = await self.cache.get_keys(pattern)
 
-                    if param_mapping:
-                        kwargs_patterns: list[str] = [
-                            rf".*'{k}':\s*'{v!s}'"
-                            for k, v in {
-                                t_param: kwargs[s_param]
-                                for t_param, s_param in param_mapping.items()
-                                if s_param in kwargs
-                            }.items()
-                        ]
-                        pattern = rf"{target_func_name}:\(.*\):{{" + ".*".join(kwargs_patterns) + ".*}"
-
-                    cached_keys: list[str] = await self.cache.get_keys_regex(
-                        target_func_name=target_func_name, pattern=pattern
-                    )
                     for cache_key in cached_keys:
                         await self.cache.delete(cache_key)
 
@@ -83,10 +67,11 @@ class RedisCacheDecorator(CacheDecoratorInterface):
 
         return decorator
 
-    def invalidate_all(self) -> Callable[..., Callable[..., Any]]:
+    def invalidate_all(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                _key = self._key_builder(func, *args, **kwargs)
                 try:
                     await self.cache.clear()
                 except Exception as e:

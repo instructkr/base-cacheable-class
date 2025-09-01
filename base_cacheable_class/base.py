@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, TypeVar
@@ -7,9 +8,28 @@ from .interfaces import CacheDecoratorInterface
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+def _wrapper_sync_or_async(func: F, execute_func: Any):
+    if asyncio.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            return await execute_func(self, *args, **kwargs)
+
+        return wrapper
+
+    @wraps(func)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        return execute_func(self, *args, **kwargs)
+
+    return wrapper
+
+
 class BaseCacheableClass:
     def __init__(self, cache_decorator: CacheDecoratorInterface) -> None:
         self._cache_decorator = cache_decorator
+
+    def get_cache_client(self):
+        return self._cache_decorator.cache
 
     def wrapped(self, func: F) -> F:
         return self._cache_decorator()(func)  # type: ignore
@@ -17,14 +37,13 @@ class BaseCacheableClass:
     @classmethod
     def cache(cls, ttl: int | None = None) -> Callable[[F], F]:
         # Note: if `ttl` is None, then the cache is stored forever in-memory.
-        def decorator(func: F) -> F:
-            @wraps(func)
-            async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        def decorator(func: F) -> Any:
+            def _execute(self, *args, **kwargs) -> Any:
                 if not hasattr(self, "_cache_decorator"):
                     raise AttributeError("_cache_decorator not found. Did you call super().__init__?")
-                return await self._cache_decorator(ttl=ttl)(func)(self, *args, **kwargs)
+                return self._cache_decorator(ttl=ttl)(func)(self, *args, **kwargs)
 
-            return wrapper  # type: ignore
+            return _wrapper_sync_or_async(func, _execute)
 
         return decorator
 
@@ -37,28 +56,24 @@ class BaseCacheableClass:
         예: {'user_id': 'customer_id'} -> 현재 함수의 customer_id를 target_func의 user_id로 매핑
         """
 
-        def decorator(func: F) -> F:
-            @wraps(func)
-            async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        def decorator(func: F) -> Any:
+            def _execute(self, *args, **kwargs) -> Any:
                 if not hasattr(self, "_cache_decorator"):
                     raise AttributeError("_cache_decorator not found. Did you call super().__init__?")
-                return await self._cache_decorator.invalidate(target_func_name, param_mapping)(func)(
-                    self, *args, **kwargs
-                )
+                return self._cache_decorator.invalidate(target_func_name, param_mapping)(func)(self, *args, **kwargs)
 
-            return wrapper  # type: ignore
+            return _wrapper_sync_or_async(func, _execute)
 
         return decorator
 
     @classmethod
     def invalidate_all(cls) -> Callable[[F], F]:
-        def decorator(func: F) -> F:
-            @wraps(func)
-            async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        def decorator(func: F) -> Any:
+            def _execute(self, *args, **kwargs) -> Any:
                 if not hasattr(self, "_cache_decorator"):
                     raise AttributeError("_cache_decorator not found. Did you call super().__init__?")
-                return await self._cache_decorator.invalidate_all()(func)(self, *args, **kwargs)
+                return self._cache_decorator.invalidate_all()(func)(self, *args, **kwargs)
 
-            return wrapper  # type: ignore
+            return _wrapper_sync_or_async(func, _execute)
 
         return decorator
